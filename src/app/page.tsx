@@ -1,18 +1,35 @@
 // src/app/page.tsx
 'use client';
 
+import { useRef } from 'react';
 import { useLinkSummarizer } from '@/hooks/use-link-summarizer';
 import { SummarizeForm } from '@/components/summarize-form';
 import { LinkList } from '@/components/link-list';
 import { Button } from '@/components/ui/button';
-import { Download, ShieldAlert } from 'lucide-react';
+import { Download, ShieldAlert, Upload } from 'lucide-react';
 import { LinkIcon } from '@/components/icons/link-icon';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 
 export default function Home() {
-  const { links, isLoading, addLink, deleteLink, updateSummary, exportToMarkdown, clearAllLinks } =
+  const { links, isLoading, addLink, deleteLink, updateSummary, exportToMarkdown, clearAllLinks, importFromMarkdown } =
     useLinkSummarizer();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      importFromMarkdown(file);
+      // Reset file input to allow uploading the same file again if needed
+      if(fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
+  const triggerFileInput = () => {
+    fileInputRef.current?.click();
+  };
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-start p-4 sm:p-8 bg-gradient-to-br from-background to-slate-900/50">
@@ -50,8 +67,26 @@ export default function Home() {
           />
         </section>
 
-        {links.length > 0 && (
-          <section className="text-center">
+        
+          <section className="text-center mt-8 flex flex-col sm:flex-row justify-center gap-4">
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleFileUpload}
+              accept=".md,text/markdown"
+              className="hidden"
+              aria-label="Upload markdown file"
+            />
+            <Button
+              onClick={triggerFileInput}
+              className="w-full sm:w-auto h-12 text-base"
+              variant="outline"
+              disabled={isLoading}
+            >
+              <Upload className="mr-2 h-5 w-5" />
+              Import from Markdown
+            </Button>
+            {links.length > 0 && (
             <Button
               onClick={exportToMarkdown}
               className="w-full sm:w-auto h-12 text-base"
@@ -60,8 +95,9 @@ export default function Home() {
               <Download className="mr-2 h-5 w-5" />
               Export as Markdown
             </Button>
+            )}
           </section>
-        )}
+        
       </main>
       <footer className="py-8 text-center text-muted-foreground text-sm">
         <p>&copy; {new Date().getFullYear()} Link Summarizer. Minimalist design for maximum focus.</p>
