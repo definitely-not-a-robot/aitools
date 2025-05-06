@@ -17,14 +17,15 @@ export function useLinkSummarizer() {
   }, []);
 
   const addLink = useCallback(
-    async (url: string) => {
+    async (originalUrl: string) => {
       setIsLoading(true);
+      const jinaUrl = `https://r.jina.ai/${originalUrl}`;
       try {
-        const result = await summarizeWebsite({ url });
+        const result = await summarizeWebsite({ url: jinaUrl });
         if (result.summary && result.summary !== 'Failed to retrieve website content.' && result.summary !== 'No summary available.') {
           const newLink: SummarizedLink = {
             id: crypto.randomUUID(),
-            url,
+            url: originalUrl, // Store the original URL for display
             summary: result.summary,
             createdAt: Date.now(),
           };
@@ -33,13 +34,13 @@ export function useLinkSummarizer() {
           storeLinks(updatedLinks);
           toast({
             title: 'Link Summarized',
-            description: `Successfully summarized ${url}`,
+            description: `Successfully summarized ${originalUrl}`,
           });
         } else {
           toast({
             variant: 'destructive',
             title: 'Summarization Failed',
-            description: result.summary || `Could not summarize ${url}. Please try another link.`,
+            description: result.summary || `Could not summarize ${originalUrl}. Please try another link.`,
           });
         }
       } catch (error) {
