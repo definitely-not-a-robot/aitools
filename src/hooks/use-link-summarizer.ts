@@ -1,3 +1,4 @@
+// src/hooks/use-link-summarizer.ts
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
@@ -68,6 +69,21 @@ export function useLinkSummarizer() {
     [links, toast]
   );
 
+  const updateSummary = useCallback(
+    (id: string, newSummary: string) => {
+      const updatedLinks = links.map((link) =>
+        link.id === id ? { ...link, summary: newSummary, updatedAt: Date.now() } : link // Added updatedAt
+      );
+      setLinks(updatedLinks);
+      storeLinks(updatedLinks);
+      toast({
+        title: 'Summary Updated',
+        description: 'The summary has been successfully updated.',
+      });
+    },
+    [links, toast]
+  );
+
   const exportToMarkdown = useCallback(() => {
     if (links.length === 0) {
       toast({
@@ -112,6 +128,7 @@ export function useLinkSummarizer() {
     isLoading,
     addLink,
     deleteLink,
+    updateSummary,
     exportToMarkdown,
     clearAllLinks,
   };

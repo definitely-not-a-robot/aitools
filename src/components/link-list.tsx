@@ -1,3 +1,4 @@
+// src/components/link-list.tsx
 'use client';
 
 import type { SummarizedLink } from '@/types';
@@ -9,11 +10,12 @@ import { ListCollapse, Trash } from 'lucide-react';
 type LinkListProps = {
   links: SummarizedLink[];
   onDelete: (id: string) => void;
+  onUpdateSummary: (id: string, newSummary: string) => void;
   onClearAll: () => void;
   isLoading: boolean;
 };
 
-export function LinkList({ links, onDelete, onClearAll, isLoading }: LinkListProps) {
+export function LinkList({ links, onDelete, onUpdateSummary, onClearAll, isLoading }: LinkListProps) {
   if (isLoading && links.length === 0) {
     return (
        <div className="text-center py-10">
@@ -44,10 +46,10 @@ export function LinkList({ links, onDelete, onClearAll, isLoading }: LinkListPro
           </Button>
         )}
       </div>
-      <ScrollArea className="h-[calc(100vh-380px)] sm:h-[calc(100vh-420px)] pr-4 -mr-4">
+      <ScrollArea className="h-[calc(100vh-380px)] sm:h-[calc(100vh-420px)] pr-4 -mr-4"> {/* Adjusted height to account for potential longer scroll area */}
         <div className="space-y-4">
           {links.map((link) => (
-            <LinkItem key={link.id} link={link} onDelete={onDelete} />
+            <LinkItem key={link.id} link={link} onDelete={onDelete} onUpdateSummary={onUpdateSummary} />
           ))}
         </div>
       </ScrollArea>

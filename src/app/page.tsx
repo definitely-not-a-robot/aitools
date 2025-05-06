@@ -1,3 +1,4 @@
+// src/app/page.tsx
 'use client';
 
 import { useLinkSummarizer } from '@/hooks/use-link-summarizer';
@@ -10,7 +11,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 
 export default function Home() {
-  const { links, isLoading, addLink, deleteLink, exportToMarkdown, clearAllLinks } =
+  const { links, isLoading, addLink, deleteLink, updateSummary, exportToMarkdown, clearAllLinks } =
     useLinkSummarizer();
 
   return (
@@ -37,10 +38,16 @@ export default function Home() {
             <ShieldAlert className="h-5 w-5 text-primary" />
             <AlertTitle className="font-semibold text-primary-foreground/90">AI Usage Note</AlertTitle>
             <AlertDescription className="text-muted-foreground">
-              The AI decides what information to include in the summary. Results may vary based on website content and structure.
+              The AI decides what information to include in the summary. Results may vary based on website content and structure. You can edit the summaries if needed.
             </AlertDescription>
           </Alert>
-          <LinkList links={links} onDelete={deleteLink} onClearAll={clearAllLinks} isLoading={isLoading && links.length === 0} />
+          <LinkList 
+            links={links} 
+            onDelete={deleteLink} 
+            onUpdateSummary={updateSummary}
+            onClearAll={clearAllLinks} 
+            isLoading={isLoading && links.length === 0} 
+          />
         </section>
 
         {links.length > 0 && (
