@@ -20,7 +20,7 @@ export type SummarizeWebsiteInput = z.infer<typeof SummarizeWebsiteInputSchema>;
 
 const SummarizeWebsiteOutputSchema = z.object({
   summary: z.string().describe('A concise summary of the website content.'),
-  toolUsed: z.boolean().describe('Whether or not the tool was used to summarize the website.'),
+  toolUsed: z.boolean().describe('Whether or not an AI tool was used in the process (decision or summarization).'),
 });
 export type SummarizeWebsiteOutput = z.infer<typeof SummarizeWebsiteOutputSchema>;
 
@@ -30,31 +30,36 @@ export async function summarizeWebsite(input: SummarizeWebsiteInput): Promise<Su
 
 const shouldSummarizeTool = ai.defineTool({
   name: 'shouldSummarize',
-  description: 'This tool determines whether to summarize the website content or not.',
+  description: 'This tool determines whether to summarize the website content based on its length.',
   inputSchema: z.object({
-    url: z.string().url().describe('The URL of the website to check.'),
     contentLength: z.number().describe('The length of the website content.'),
   }),
   outputSchema: z.boolean().describe('A boolean value indicating whether to summarize the website content or not.'),
 }, async (input) => {
-  // Implement the logic to determine whether to summarize the website or not.
-  // If the content length is greater than 1000 characters, summarize the website.
   return input.contentLength > 1000;
 });
 
-const summarizeWebsitePrompt = ai.definePrompt({
-  name: 'summarizeWebsitePrompt',
+const summarizeContentPrompt = ai.definePrompt({
+  name: 'summarizeContentPrompt',
   input: {
-    schema: SummarizeWebsiteInputSchema,
+    schema: z.object({
+      url: z.string().url().describe('The URL of the website (for context).'),
+      content: z.string().describe('The actual text content of the website to be summarized.'),
+    }),
   },
   output: {
-    schema: SummarizeWebsiteOutputSchema,
+    schema: z.object({
+        summary: z.string().describe('A concise summary of the provided website content.'),
+    })
   },
-  tools: [shouldSummarizeTool],
-  prompt: `You are an AI assistant that summarizes the content of a website.\n
-  The user will provide a URL. You will use the shouldSummarize tool to decide if you should summarize the content of the website.\n
-  If the tool returns true, summarize the content of the website.\n  If the tool returns false, return an empty summary.\n
-  URL: {{{url}}}\n  Summary:`, // Ensure you're using Handlebars syntax.
+  prompt: `You are an AI assistant that summarizes website content.
+You have been provided with the text content of a website.
+Please generate a concise summary for the following content from URL: {{{url}}}
+
+Content:
+{{{content}}}
+
+Provide only the summary in your response.`,
 });
 
 const summarizeWebsiteFlow = ai.defineFlow(
@@ -63,37 +68,40 @@ const summarizeWebsiteFlow = ai.defineFlow(
     inputSchema: SummarizeWebsiteInputSchema,
     outputSchema: SummarizeWebsiteOutputSchema,
   },
-  async input => {
-    // Call the getWebsiteContent service to fetch the website content
-    const websiteContent = await getWebsiteContent(input.url);
+  async (flowInput): Promise<SummarizeWebsiteOutput> => {
+    const websiteContent = await getWebsiteContent(flowInput.url);
 
-    // If the content is empty, return an empty summary
     if (!websiteContent) {
       return {
         summary: 'Failed to retrieve website content.',
-        toolUsed: false,
+        toolUsed: false, 
       };
     }
-
-    // Call the shouldSummarize tool to determine whether to summarize the website content or not.
-    const shouldSummarize = await shouldSummarizeTool({
-      url: input.url,
+    
+    const doSummarize = await shouldSummarizeTool({
       contentLength: websiteContent.length,
     });
 
-    if (!shouldSummarize) {
+    if (!doSummarize) {
       return {
-        summary: 'Website content is too short to summarize.',
+        summary: 'Website content is too short to summarize (less than 1000 characters).',
+        toolUsed: true, 
+      };
+    }
+
+    const promptInput = { url: flowInput.url, content: websiteContent };
+    const { output } = await summarizeContentPrompt(promptInput);
+
+    if (!output || !output.summary) { 
+      return {
+        summary: 'AI failed to generate a summary for the content.',
         toolUsed: true,
       };
     }
 
-    // Call the prompt to summarize the website content
-    const {output} = await summarizeWebsitePrompt(input);
-
     return {
-      summary: output?.summary ?? 'No summary available.',
-      toolUsed: true,
+      summary: output.summary,
+      toolUsed: true, 
     };
   }
 );
