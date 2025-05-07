@@ -49,7 +49,7 @@ export function LinkItem({ link, onDelete, onUpdateSummary }: LinkItemProps) {
                 href={link.url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="hover:text-primary transition-colors flex items-center gap-1.5 group"
+                className="text-primary hover:text-foreground transition-colors flex items-center gap-1.5 group"
               >
                 <span className="truncate group-hover:underline">{link.url}</span>
                 <ExternalLink size={16} className="shrink-0" />
