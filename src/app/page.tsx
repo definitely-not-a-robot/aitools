@@ -1,26 +1,67 @@
 // src/app/page.tsx
 'use client';
 
-import { useRef } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import { useLinkSummarizer } from '@/hooks/use-link-summarizer';
 import { SummarizeForm } from '@/components/summarize-form';
 import { LinkList } from '@/components/link-list';
 import { Button } from '@/components/ui/button';
-import { Download, ShieldAlert, Upload } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Download, ShieldAlert, Upload, Edit3, CheckSquare } from 'lucide-react';
 import { LinkIcon } from '@/components/icons/link-icon';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 
 export default function Home() {
-  const { links, isLoading, addLink, deleteLink, updateSummary, exportToMarkdown, clearAllLinks, importFromMarkdown } =
-    useLinkSummarizer();
+  const { 
+    links, 
+    listName, 
+    isLoading, 
+    addLink, 
+    deleteLink, 
+    updateSummary, 
+    exportToMarkdown, 
+    clearAllLinks, 
+    importFromMarkdown,
+    updateListName 
+  } = useLinkSummarizer();
+  
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [editableListName, setEditableListName] = useState(listName);
+  const [isEditingListName, setIsEditingListName] = useState(false);
+
+  useEffect(() => {
+    setEditableListName(listName);
+  }, [listName]);
+
+  const handleListNameChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setEditableListName(event.target.value);
+  };
+
+  const handleSaveListName = () => {
+    if (editableListName.trim() !== '') {
+      updateListName(editableListName.trim());
+    } else {
+      // Reset to original if empty, or show error
+      setEditableListName(listName); 
+    }
+    setIsEditingListName(false);
+  };
+  
+  const handleListNameKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === 'Enter') {
+      handleSaveListName();
+    } else if (event.key === 'Escape') {
+      setEditableListName(listName);
+      setIsEditingListName(false);
+    }
+  };
+
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
       importFromMarkdown(file);
-      // Reset file input to allow uploading the same file again if needed
       if(fileInputRef.current) {
         fileInputRef.current.value = '';
       }
@@ -46,7 +87,36 @@ export default function Home() {
           </p>
         </header>
 
-        <section className="mb-10">
+        <section className="mb-6">
+          <div className="flex items-center gap-2 mb-6">
+            {isEditingListName ? (
+              <>
+                <Input 
+                  type="text"
+                  value={editableListName}
+                  onChange={handleListNameChange}
+                  onKeyDown={handleListNameKeyDown}
+                  onBlur={handleSaveListName}
+                  className="text-2xl font-semibold flex-grow h-12"
+                  placeholder="Enter list name"
+                  aria-label="Edit list name"
+                  autoFocus
+                />
+                <Button onClick={handleSaveListName} size="icon" className="h-12 w-12" aria-label="Save list name">
+                  <CheckSquare className="h-6 w-6" />
+                </Button>
+              </>
+            ) : (
+              <>
+                <h2 className="text-2xl font-semibold flex-grow truncate" title={listName}>
+                  {listName || "My Summarized Links"}
+                </h2>
+                <Button variant="ghost" size="icon" onClick={() => setIsEditingListName(true)} aria-label="Edit list name">
+                  <Edit3 className="h-6 w-6 text-muted-foreground hover:text-primary" />
+                </Button>
+              </>
+            )}
+          </div>
           <SummarizeForm onSubmit={addLink} isLoading={isLoading} />
         </section>
 

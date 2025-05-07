@@ -3,18 +3,32 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import type { SummarizedLink } from '@/types';
-import { getStoredLinks, storeLinks } from '@/lib/local-storage';
+import { getStoredLinks, storeLinks, getStoredListName, storeListName } from '@/lib/local-storage';
 import { summarizeWebsite } from '@/ai/flows/summarize-website';
 import { useToast } from '@/hooks/use-toast';
 
 export function useLinkSummarizer() {
   const [links, setLinks] = useState<SummarizedLink[]>([]);
+  const [listName, setListName] = useState<string>('');
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
     setLinks(getStoredLinks());
+    setListName(getStoredListName());
   }, []);
+
+  const updateListName = useCallback(
+    (newName: string) => {
+      setListName(newName);
+      storeListName(newName);
+      toast({
+        title: 'List Name Updated',
+        description: `List name changed to "${newName}".`,
+      });
+    },
+    [toast]
+  );
 
   const addLink = useCallback(
     async (originalUrl: string) => {
@@ -103,24 +117,29 @@ export function useLinkSummarizer() {
       return;
     }
 
-    const markdownContent = links
+    const markdownHeader = `# ${listName}\n\n`;
+    const markdownBody = links
       .map((link) => `## [${link.url}](${link.url})\n\n${link.summary}\n\n---\n`)
       .join('\n');
+    
+    const markdownContent = markdownHeader + markdownBody;
 
     const blob = new Blob([markdownContent], { type: 'text/markdown' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'summarized_links.md';
+    // Make filename more descriptive if listName is available
+    const filename = listName ? `${listName.replace(/\s+/g, '_').toLowerCase()}_summaries.md` : 'summarized_links.md';
+    a.download = filename;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
     toast({
       title: 'Export Successful',
-      description: 'Your links have been exported to markdown.',
+      description: `Your list "${listName}" has been exported.`,
     });
-  }, [links, toast]);
+  }, [links, listName, toast]);
 
   const clearAllLinks = useCallback(() => {
     setLinks([]);
@@ -147,28 +166,37 @@ export function useLinkSummarizer() {
       }
 
       try {
+        const lines = content.split('\n');
+        let newListName = listName; // Default to current or default list name
+        let contentToParse = content;
+
+        if (lines.length > 0 && lines[0].startsWith('# ')) {
+          newListName = lines[0].substring(2).trim();
+          updateListName(newListName); // Update the list name
+          contentToParse = lines.slice(1).join('\n').trim(); // Remove the H1 title line
+        }
+        
         const importedLinks: SummarizedLink[] = [];
-        const sections = content.split('---').map(s => s.trim()).filter(s => s);
+        const sections = contentToParse.split('---').map(s => s.trim()).filter(s => s);
 
         sections.forEach(section => {
           const urlMatch = section.match(/^## \[(.*?)\]\((.*?)\)/);
           if (urlMatch && urlMatch[1] && urlMatch[2]) {
-            const url = urlMatch[2]; // The captured URL
+            const url = urlMatch[2];
             const summary = section.substring(urlMatch[0].length).trim();
-            if (summary) { // Ensure summary is not empty
+            if (summary) {
               importedLinks.push({
                 id: crypto.randomUUID(),
                 url: url,
                 summary: summary,
-                createdAt: Date.now(), // Set current time for imported links
-                                       // For more sophisticated import, you could try to parse a date if present
+                createdAt: Date.now(),
               });
             }
           }
         });
         
-        if (importedLinks.length === 0 && sections.length > 0) {
-          toast({
+        if (importedLinks.length === 0 && sections.length > 0 && !contentToParse.startsWith('# ')) {
+           toast({
             variant: 'destructive',
             title: 'Import Error',
             description: 'No valid links found in the Markdown file. Please ensure it follows the exported format (e.g., ## [URL_TEXT](URL_LINK) --- SUMMARY ---).',
@@ -177,7 +205,7 @@ export function useLinkSummarizer() {
           return;
         }
         
-        if (importedLinks.length === 0 && sections.length === 0) {
+        if (importedLinks.length === 0 && sections.length === 0 && lines.length > 0 && !lines[0].startsWith('# ')) {
            toast({
             variant: 'destructive',
             title: 'Import Failed',
@@ -187,17 +215,16 @@ export function useLinkSummarizer() {
           return;
         }
 
-        // Add to existing links, avoiding duplicates by URL
         const currentLinkUrls = new Set(links.map(link => link.url));
-        const newLinks = importedLinks.filter(il => !currentLinkUrls.has(il.url));
+        const newUniqueLinks = importedLinks.filter(il => !currentLinkUrls.has(il.url));
         
-        const updatedLinks = [...newLinks, ...links].sort((a, b) => b.createdAt - a.createdAt);
+        const updatedLinks = [...newUniqueLinks, ...links].sort((a, b) => b.createdAt - a.createdAt);
         
         setLinks(updatedLinks);
         storeLinks(updatedLinks);
         toast({
           title: 'Import Successful',
-          description: `${newLinks.length} new link(s) imported. ${importedLinks.length - newLinks.length} duplicate(s) ignored.`,
+          description: `${newUniqueLinks.length} new link(s) imported into "${newListName}". ${importedLinks.length - newUniqueLinks.length} duplicate(s) ignored.`,
         });
 
       } catch (error) {
@@ -220,11 +247,12 @@ export function useLinkSummarizer() {
       setIsLoading(false);
     }
     reader.readAsText(file);
-  }, [links, toast]);
+  }, [links, toast, listName, updateListName]);
 
 
   return {
     links,
+    listName,
     isLoading,
     addLink,
     deleteLink,
@@ -232,5 +260,6 @@ export function useLinkSummarizer() {
     exportToMarkdown,
     clearAllLinks,
     importFromMarkdown,
+    updateListName,
   };
 }
